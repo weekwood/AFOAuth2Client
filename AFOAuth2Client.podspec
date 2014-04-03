@@ -15,6 +15,9 @@ Pod::Spec.new do |s|
 
   s.ios.frameworks = 'Security'
 
+  s.ios.deployment_target = "6.0"
+  s.osx.deployment_target = "10.8"
+
   s.prefix_header_contents = <<-EOS
 #ifdef __OBJC__
   #import <Security/Security.h>
