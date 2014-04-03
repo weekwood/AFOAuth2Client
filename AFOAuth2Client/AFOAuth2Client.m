@@ -20,8 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#import "AFJSONRequestOperation.h"
-
+#import <AFNetworking/AFHTTPRequestOperationManager.h>
+#import <AFNetworking/AFNetworkActivityIndicatorManager.h>
+#import <AFNetworking/AFURLResponseSerialization.h>
 #import "AFOAuth2Client.h"
 
 NSString * const kAFOAuthCodeGrantType = @"authorization_code";
@@ -43,6 +44,8 @@ static NSMutableDictionary * AFKeychainQueryDictionaryWithIdentifier(NSString *i
 #pragma mark -
 
 @interface AFOAuth2Client ()
+
+@property AFHTTPRequestOperationManager *operationManager;
 @property (readwrite, nonatomic) NSString *serviceProviderIdentifier;
 @property (readwrite, nonatomic) NSString *clientID;
 @property (readwrite, nonatomic) NSString *secret;
@@ -63,16 +66,19 @@ static NSMutableDictionary * AFKeychainQueryDictionaryWithIdentifier(NSString *i
 {
     NSParameterAssert(clientID);
 
-    self = [super initWithBaseURL:url];
-    if (!self) {
+    self = [super init];
+    if (!self)
+    {
         return nil;
     }
 
-    self.serviceProviderIdentifier = [self.baseURL host];
+    _operationManager = [[AFHTTPRequestOperationManager alloc] initWithBaseURL:url];
+    _operationManager.requestSerializer = [AFJSONRequestSerializer new];
+    _operationManager.responseSerializer = [AFJSONResponseSerializer new];
+    self.serviceProviderIdentifier = _operationManager.baseURL.host;
     self.clientID = clientID;
     self.secret = secret;
-
-    [self registerHTTPOperationClass:[AFJSONRequestOperation class]];
+    [_operationManager.reachabilityManager startMonitoring];
 
     return self;
 }
@@ -92,9 +98,9 @@ static NSMutableDictionary * AFKeychainQueryDictionaryWithIdentifier(NSString *i
                                  ofType:(NSString *)type
 {
     // See http://tools.ietf.org/html/rfc6749#section-7.1
-    if ([[type lowercaseString] isEqualToString:@"bearer"]) {
-        [self setDefaultHeader:@"Authorization" value:[NSString stringWithFormat:@"Bearer %@", token]];
-    }
+    if ([[type lowercaseString] isEqualToString:@"bearer"])
+    {
+        [_operationManager.requestSerializer setValue:[NSString stringWithFormat:@"Bearer %@", token] forHTTPHeaderField:@"Authorization"];    }
 }
 
 #pragma mark -
@@ -167,10 +173,12 @@ static NSMutableDictionary * AFKeychainQueryDictionaryWithIdentifier(NSString *i
     [mutableParameters setValue:self.secret forKey:@"client_secret"];
     parameters = [NSDictionary dictionaryWithDictionary:mutableParameters];
 
-    NSMutableURLRequest *mutableRequest = [self requestWithMethod:@"POST" path:path parameters:parameters];
+    NSMutableURLRequest *mutableRequest = [NSMutableURLRequest requestWithURL:_operationManager.baseURL cachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData timeoutInterval:10];
+    mutableRequest.HTTPMethod = @"POST";
     [mutableRequest setValue:@"application/json" forHTTPHeaderField:@"Accept"];
 
-    AFHTTPRequestOperation *requestOperation = [self HTTPRequestOperationWithRequest:mutableRequest success:^(AFHTTPRequestOperation *operation, id responseObject) {
+    AFHTTPRequestOperation *requestOperation = [[AFHTTPRequestOperation alloc] initWithRequest:mutableRequest];
+    [requestOperation setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
         if ([responseObject valueForKey:@"error"]) {
             if (failure) {
                 // TODO: Resolve the `error` field into a proper NSError object
@@ -207,7 +215,7 @@ static NSMutableDictionary * AFKeychainQueryDictionaryWithIdentifier(NSString *i
         }
     }];
 
-    [self enqueueHTTPRequestOperation:requestOperation];
+    [_operationManager.operationQueue addOperation:requestOperation];
 }
 
 @end
@@ -277,9 +285,9 @@ static NSMutableDictionary * AFKeychainQueryDictionaryWithIdentifier(NSString *i
     id securityAccessibility = nil;
 #if (defined(__IPHONE_OS_VERSION_MAX_ALLOWED) && __IPHONE_OS_VERSION_MAX_ALLOWED >= 43000) || (defined(__MAC_OS_X_VERSION_MAX_ALLOWED) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 1090)
     if( &kSecAttrAccessibleWhenUnlocked != NULL )
-        securityAccessibility = kSecAttrAccessibleWhenUnlocked;
+        securityAccessibility = (__bridge id)(kSecAttrAccessibleWhenUnlocked);
 #endif
-    
+
     return [[self class] storeCredential:credential withIdentifier:identifier withAccessibility:securityAccessibility];
 }
 
@@ -296,7 +304,7 @@ static NSMutableDictionary * AFKeychainQueryDictionaryWithIdentifier(NSString *i
     NSMutableDictionary *updateDictionary = [NSMutableDictionary dictionary];
     NSData *data = [NSKeyedArchiver archivedDataWithRootObject:credential];
     [updateDictionary setObject:data forKey:(__bridge id)kSecValueData];
-    
+
     if( securityAccessibility )
         [updateDictionary setObject:securityAccessibility forKey:(__bridge id)kSecAttrAccessible];
 
