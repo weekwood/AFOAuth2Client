@@ -114,11 +114,10 @@ static NSMutableDictionary * AFKeychainQueryDictionaryWithIdentifier(NSString *i
 {
     NSMutableDictionary *mutableParameters = [NSMutableDictionary dictionary];
     [mutableParameters setObject:kAFOAuthPasswordCredentialsGrantType forKey:@"grant_type"];
-    [mutableParameters setValue:username forKey:@"username"];
-    [mutableParameters setValue:password forKey:@"password"];
     [mutableParameters setValue:scope forKey:@"scope"];
     NSDictionary *parameters = [NSDictionary dictionaryWithDictionary:mutableParameters];
 
+    [_operationManager.requestSerializer setAuthorizationHeaderFieldWithUsername:username password:password];
     [self authenticateUsingOAuthWithPath:path parameters:parameters success:success failure:failure];
 }
 
