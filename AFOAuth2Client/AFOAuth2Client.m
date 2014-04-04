@@ -73,7 +73,7 @@ static NSMutableDictionary * AFKeychainQueryDictionaryWithIdentifier(NSString *i
     }
 
     _operationManager = [[AFHTTPRequestOperationManager alloc] initWithBaseURL:url];
-    _operationManager.requestSerializer = [AFJSONRequestSerializer new];
+    _operationManager.requestSerializer = [AFHTTPRequestSerializer new];
     _operationManager.responseSerializer = [AFJSONResponseSerializer new];
     self.serviceProviderIdentifier = _operationManager.baseURL.host;
     self.clientID = clientID;
@@ -173,12 +173,8 @@ static NSMutableDictionary * AFKeychainQueryDictionaryWithIdentifier(NSString *i
     [mutableParameters setValue:self.secret forKey:@"client_secret"];
     parameters = [NSDictionary dictionaryWithDictionary:mutableParameters];
 
-    NSMutableURLRequest *mutableRequest = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:path relativeToURL:_operationManager.baseURL] cachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData timeoutInterval:10];
-    mutableRequest.HTTPMethod = @"POST";
-    [mutableRequest setValue:@"application/json" forHTTPHeaderField:@"Accept"];
+    [_operationManager POST:path parameters:parameters success:^(AFHTTPRequestOperation *operation, id responseObject) {
 
-    AFHTTPRequestOperation *requestOperation = [[AFHTTPRequestOperation alloc] initWithRequest:mutableRequest];
-    [requestOperation setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
         if ([responseObject valueForKey:@"error"]) {
             if (failure) {
                 // TODO: Resolve the `error` field into a proper NSError object
@@ -215,7 +211,6 @@ static NSMutableDictionary * AFKeychainQueryDictionaryWithIdentifier(NSString *i
         }
     }];
 
-    [_operationManager.operationQueue addOperation:requestOperation];
 }
 
 @end
