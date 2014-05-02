@@ -21,7 +21,6 @@
 // THE SOFTWARE.
 
 #import <AFNetworking/AFHTTPRequestOperationManager.h>
-#import <AFNetworking/UIKit+AFNetworking/AFNetworkActivityIndicatorManager.h>
 #import <AFNetworking/AFURLResponseSerialization.h>
 #import "AFOAuth2Client.h"
 
